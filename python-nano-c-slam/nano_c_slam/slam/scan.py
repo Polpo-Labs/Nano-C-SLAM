@@ -17,11 +17,29 @@ Reuses core.geometry and slam.mapping (DRY).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from ..core.geometry import relative, transform_points
-from ..core.types import AugmentedPose, Scan
+from ..core.types import AugmentedPose, Pose2D, Scan
 from .mapping import depth_local_points
+
+
+@dataclass
+class ScanRecord:
+    """An aggregated scan ready for matching: its cloud plus where it was taken.
+
+    drone_id    : which drone acquired it (needed for inter- vs intra-matching).
+    anchor_id   : pose id of the scan's anchor within that drone's graph.
+    anchor_pose : the drone's *estimated* anchor pose (for proximity + ICP init).
+    cloud       : the (N, 2) aggregated scan points, in the anchor's body frame.
+    """
+
+    drone_id: int
+    anchor_id: int
+    anchor_pose: Pose2D
+    cloud: np.ndarray
 
 
 def build_scan(drone_id: int, frames: list[AugmentedPose]) -> Scan:
