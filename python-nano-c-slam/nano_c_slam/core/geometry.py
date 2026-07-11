@@ -85,3 +85,17 @@ def relative(a: Pose2D, b: Pose2D) -> Pose2D:
     odometry-edge construction and ICP-based loop-closure edges.
     """
     return matrix_to_pose(np.linalg.inv(pose_to_matrix(a)) @ pose_to_matrix(b))
+
+
+def transform_points(pose: Pose2D, points: np.ndarray) -> np.ndarray:
+    """Map body-frame points into the world frame using `pose`.
+
+    `points` is an (N, 2) array of (x, y) in the robot's body frame; the result
+    is the same points rotated by the pose's heading and translated to its
+    position. Used to project range readings into the map, and later by ICP to
+    move one point cloud onto another. Handles the empty (0, 2) case cleanly.
+    """
+    points = np.asarray(points, dtype=float).reshape(-1, 2)
+    c, s = np.cos(pose.psi), np.sin(pose.psi)
+    rotation = np.array([[c, -s], [s, c]])
+    return points @ rotation.T + np.array([pose.x, pose.y])

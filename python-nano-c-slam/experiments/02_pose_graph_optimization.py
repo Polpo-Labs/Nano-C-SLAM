@@ -45,9 +45,7 @@ def main() -> None:
     odom = integrate(start, steps, rng=rng, trans_sigma=0.01, rot_sigma=0.01)
 
     graph = PoseGraph(odom)
-    # Odometry edges between consecutive poses.
-    for i in range(len(steps)):
-        graph.add_edge(i, i + 1, relative(odom[i], odom[i + 1]))
+    graph.add_odometry_chain()  # consecutive-pose edges from the odometry estimate
     # One loop closure at each lap return (those poses coincide with the start).
     lap_ends = [steps_per_lap(increments) * lap for lap in range(1, laps + 1)]
     for lap_end in lap_ends:

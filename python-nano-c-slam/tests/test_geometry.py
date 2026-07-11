@@ -15,6 +15,7 @@ from nano_c_slam.core.geometry import (
     matrix_to_pose,
     pose_to_matrix,
     relative,
+    transform_points,
     wrap_angle,
 )
 from nano_c_slam.core.types import Pose2D
@@ -62,3 +63,21 @@ def test_relative_then_compose_reconstructs_target():
 def test_relative_of_pose_with_itself_is_identity():
     pose = Pose2D(5.0, 5.0, 2.0)
     assert_pose_close(relative(pose, pose), Pose2D(0.0, 0.0, 0.0))
+
+
+def test_transform_points_translates_and_rotates():
+    pts = np.array([[1.0, 0.0], [0.0, 2.0]])
+    # Identity pose leaves points unchanged.
+    np.testing.assert_allclose(transform_points(Pose2D(0, 0, 0), pts), pts)
+    # Pure translation shifts every point.
+    np.testing.assert_allclose(
+        transform_points(Pose2D(3, -1, 0), pts), pts + np.array([3, -1])
+    )
+    # 90 deg rotation sends body +x to world +y and body +y to world -x.
+    rotated = transform_points(Pose2D(0, 0, np.pi / 2), pts)
+    np.testing.assert_allclose(rotated, [[0.0, 1.0], [-2.0, 0.0]], atol=1e-9)
+
+
+def test_transform_points_handles_empty():
+    out = transform_points(Pose2D(1, 2, 0.5), np.empty((0, 2)))
+    assert out.shape == (0, 2)

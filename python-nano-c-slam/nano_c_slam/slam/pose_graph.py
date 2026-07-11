@@ -163,6 +163,17 @@ class PoseGraph:
             information = np.eye(3)
         self.edges.append(Edge(from_id, to_id, measurement, information, edge_type))
 
+    def add_odometry_chain(self, information: np.ndarray | None = None) -> None:
+        """Add odometry edges between every pair of consecutive poses.
+
+        The measurement for edge (i, i+1) is the relative pose between the
+        current estimates -- i.e. the motion the robot believes it made. This is
+        the standard backbone of the graph, so both share it here instead of
+        re-writing the loop in every experiment.
+        """
+        for i in range(len(self.poses) - 1):
+            self.add_edge(i, i + 1, relative(self.poses[i], self.poses[i + 1]), information)
+
     def optimize(self, fixed_ids: tuple[int, ...] = (0,), **kwargs) -> list[Pose2D]:
         """Optimize in place and return the corrected poses."""
         self.poses = optimize_poses(self.poses, self.edges, fixed_ids, **kwargs)
