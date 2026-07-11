@@ -16,8 +16,28 @@ from __future__ import annotations
 import numpy as np
 
 from ..core.geometry import transform_points
-from ..core.types import Pose2D
+from ..core.types import DepthFrame, Pose2D
 from ..sim.sensor import RangeReading
+
+
+def beams_to_local_points(bearings: np.ndarray, ranges: np.ndarray) -> np.ndarray:
+    """Turn (bearing, range) pairs into body-frame (x, y) points.
+
+    Each hit sits at (r*cos b, r*sin b) in the robot body frame. This is the one
+    place that conversion lives -- reused for both generic range readings and the
+    paper's 4x8 depth frames (DRY).
+    """
+    return np.column_stack([ranges * np.cos(bearings), ranges * np.sin(bearings)])
+
+
+def reading_local_points(reading: RangeReading) -> np.ndarray:
+    """Body-frame points of a range reading's valid beams."""
+    return beams_to_local_points(reading.bearings[reading.valid], reading.ranges[reading.valid])
+
+
+def depth_local_points(depth: DepthFrame, bearings: np.ndarray) -> np.ndarray:
+    """Body-frame points of a depth frame's valid pixels (bearings from the sensor)."""
+    return beams_to_local_points(bearings[depth.valid], depth.ranges[depth.valid])
 
 
 def project_reading(pose: Pose2D, reading: RangeReading) -> np.ndarray:
@@ -26,11 +46,7 @@ def project_reading(pose: Pose2D, reading: RangeReading) -> np.ndarray:
     Only beams that actually hit a wall are mapped; no-hit beams carry no
     information about where something is, so they are dropped.
     """
-    b = reading.bearings[reading.valid]
-    r = reading.ranges[reading.valid]
-    # Each hit sits at (r*cos, r*sin) in the body frame, then moves to the world.
-    local_points = np.column_stack([r * np.cos(b), r * np.sin(b)])
-    return transform_points(pose, local_points)
+    return transform_points(pose, reading_local_points(reading))
 
 
 def build_point_cloud(poses: list[Pose2D], readings: list[RangeReading]) -> np.ndarray:
