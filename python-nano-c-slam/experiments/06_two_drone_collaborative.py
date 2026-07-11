@@ -106,8 +106,14 @@ def main() -> None:
 
     # --- Static before/after map ---
     _plot_before_after(world, m0, m1, corrected0, corrected1)
-    # --- Runtime GIF ---
-    _animate(world, m0, m1)
+
+    # --- Two runtime GIFs, using the same generic animator ---
+    # 1) The live belief: scans placed at the drifting odometry poses.
+    _animate(world, [(m0, m0.odom), (m1, m1.odom)],
+             "06_two_drone_runtime.gif", "two drones mapping live (odometry belief)")
+    # 2) The corrected map assembling: same scans placed at the optimized poses.
+    _animate(world, [(m0, corrected0), (m1, corrected1)],
+             "06_two_drone_corrected.gif", "corrected map assembling (after optimization)")
 
 
 def _plot_before_after(world, m0, m1, corrected0, corrected1):
@@ -141,26 +147,26 @@ def _plot_before_after(world, m0, m1, corrected0, corrected1):
     print(f"saved map -> {out}")
 
 
-def _animate(world, m0, m1):
-    """A runtime GIF: drones (squares) flying, odometry trails, and the live map.
+def _animate(world, drones, out_name, title):
+    """Generic runtime GIF of drones flying and their map assembling.
 
-    The point clouds are each scan placed at the drone's *believed* (odometry)
-    pose at acquisition time, revealed once the scan finishes -- so you watch the
-    live map build up and smear as odometry drifts (this is the pre-correction
-    belief; R6's optimization is what later snaps it straight).
+    drones : list of (mission, trajectory) pairs, where `trajectory` is the pose
+             list to visualize -- pass the odometry poses to see the live belief,
+             or the optimized poses to watch the corrected map assemble. Each
+             scan is placed at `trajectory[anchor]` and revealed once its 20-frame
+             rotation finishes, so the map grows scan by scan.
     """
-    missions = [m0, m1]
-    n_poses = len(m0.truth)
+    n_poses = len(drones[0][1])
     n_frames = 90
     stride = max(1, n_poses // n_frames)
 
-    # Precompute, per drone, each scan's world points (odometry frame) and the
-    # time it becomes available (after its 20-frame rotation completes).
-    revealed = []
-    for mission in missions:
-        items = [(s.anchor_id + SCAN_FRAMES, transform_points(s.anchor_pose, s.cloud)[::3])
-                 for s in mission.scans]
-        revealed.append(items)
+    # Per drone: each scan's world points (in the given trajectory's frame) and
+    # the time it becomes available.
+    revealed = [
+        [(s.anchor_id + SCAN_FRAMES, transform_points(trajectory[s.anchor_id], s.cloud)[::3])
+         for s in mission.scans]
+        for mission, trajectory in drones
+    ]
 
     fig, ax = plt.subplots(figsize=(7, 6))
 
@@ -169,24 +175,23 @@ def _animate(world, m0, m1):
         t = min(frame * stride, n_poses - 1)
         for x1, y1, x2, y2 in world.walls:
             ax.plot([x1, x2], [y1, y2], color="black", linewidth=1.5)
-        for mission, color, items in zip(missions, DRONE_COLORS, revealed):
-            # Accumulated live map: every scan revealed so far.
+        for (mission, trajectory), color, items in zip(drones, DRONE_COLORS, revealed):
+            # Accumulated map: every scan revealed so far.
             shown = [pts for reveal_t, pts in items if reveal_t <= t]
             if shown:
                 cloud = np.vstack(shown)
                 ax.scatter(cloud[:, 0], cloud[:, 1], s=2, alpha=0.15, color=color)
-            odom = mission.odom
-            ax.plot([p.x for p in odom[: t + 1]], [p.y for p in odom[: t + 1]],
+            # Trajectory so far + the drone drawn as a square at its current pose.
+            ax.plot([p.x for p in trajectory[: t + 1]], [p.y for p in trajectory[: t + 1]],
                     color=color, linewidth=1, alpha=0.8)
-            ax.plot(mission.truth[t].x, mission.truth[t].y, marker="s",
-                    color=color, markersize=12)
+            ax.plot(trajectory[t].x, trajectory[t].y, marker="s", color=color, markersize=12)
         ax.set_aspect("equal")
         ax.set_xlim(-3, 7)
         ax.set_ylim(-3, 5)
-        ax.set_title(f"R6 runtime: two drones mapping live (t={t})")
+        ax.set_title(f"R6: {title} (t={t})")
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    out = os.path.join(OUT_DIR, "06_two_drone_runtime.gif")
+    out = os.path.join(OUT_DIR, out_name)
     save_gif(fig, update, n_frames, out, fps=15)
     print(f"saved gif -> {out}")
 
