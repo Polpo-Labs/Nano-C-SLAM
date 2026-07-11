@@ -1,0 +1,15 @@
+# Set up the environment (from python-nano-c-slam/) with:
+#   ../.venv/Scripts/python.exe -m pip install -r requirements.txt
+#
+# This installs the project in editable mode. Runtime deps (numpy/scipy/
+# matplotlib) are declared once in pyproject.toml -- not duplicated here.
+
+-e .
+
+# --- Dev tooling ---
+pytest>=8.0
+
+# --- Added in later phases (uncomment when we get there) ---
+# pygame              # interactive 2D "game" view of the swarm        (Phase 4)
+# mcap                # record MCAP logs for offline Foxglove replay    (Phase 4)
+# foxglove-sdk        # live streaming of point clouds / poses to Foxglove (Phase 4)

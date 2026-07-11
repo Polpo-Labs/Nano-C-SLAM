@@ -1,0 +1,27 @@
+# Project + tooling config. We install this package in editable mode
+# (`pip install -e .`) so `import nano_c_slam...` works everywhere -- in tests and
+# in experiment scripts -- without any per-file sys.path hacks.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nano-c-slam"
+version = "0.0.1"
+description = "Clean Python reproduction + 2D simulation of Nano-C-SLAM for robot swarms."
+requires-python = ">=3.12"
+# Runtime dependencies live here (single source of truth). requirements.txt just
+# installs this package editable, so we never list deps in two places.
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "matplotlib>=3.8",
+]
+
+[tool.setuptools.packages.find]
+# Only the library package is importable; tests/ and experiments/ stay scripts.
+include = ["nano_c_slam*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
