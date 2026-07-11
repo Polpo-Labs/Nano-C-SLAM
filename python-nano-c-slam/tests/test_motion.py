@@ -12,6 +12,7 @@ import pytest
 from nano_c_slam.core.geometry import wrap_angle
 from nano_c_slam.core.types import Pose2D
 from nano_c_slam.sim.motion import noisy_step, step
+from nano_c_slam.sim.trajectories import square_steps
 
 
 def total_drift(a: Pose2D, b: Pose2D) -> float:
@@ -19,15 +20,10 @@ def total_drift(a: Pose2D, b: Pose2D) -> float:
     return float(np.hypot(a.x - b.x, a.y - b.y))
 
 
-def square_loop_steps(side: float = 1.0) -> list[tuple[float, float, float]]:
-    """The (dx, dy, dpsi) steps of a unit square: forward, turn 90 deg, x4.
-
-    Driving this from any start pose and integrating the true steps must return
-    exactly to the start pose -- a clean, drift-free reference trajectory.
-    """
-    forward = (side, 0.0, 0.0)
-    turn = (0.0, 0.0, np.pi / 2)
-    return [forward, turn] * 4
+# A single-increment unit square: forward, turn 90 deg, x4 -- the simplest
+# closed loop, reusing the shared trajectory generator (no local duplicate).
+def square_loop_steps() -> list[tuple[float, float, float]]:
+    return square_steps(side=1.0, laps=1, increments=1)
 
 
 def test_zero_step_is_identity():

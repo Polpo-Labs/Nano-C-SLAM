@@ -63,3 +63,28 @@ def noisy_step(
         dy + rng.normal(0.0, trans_sigma),
         dpsi + rng.normal(0.0, rot_sigma),
     )
+
+
+def integrate(
+    start: Pose2D,
+    steps: list[tuple[float, float, float]],
+    rng: np.random.Generator | None = None,
+    trans_sigma: float = 0.0,
+    rot_sigma: float = 0.0,
+) -> list[Pose2D]:
+    """Integrate a sequence of motion steps from `start` into a list of poses.
+
+    Returns the full path including the start pose, so the result has
+    len(steps) + 1 entries. With `rng=None` the motion is exact -> ground truth;
+    with an `rng` and sigmas it drifts -> odometry. Both branches reuse the
+    motion functions above, so there is exactly one motion model in the project.
+    """
+    pose = start
+    path = [pose]
+    for dx, dy, dpsi in steps:
+        if rng is None:
+            pose = step(pose, dx, dy, dpsi)
+        else:
+            pose = noisy_step(pose, dx, dy, dpsi, rng, trans_sigma, rot_sigma)
+        path.append(pose)
+    return path
