@@ -37,6 +37,7 @@ from nano_c_slam.sim.world import World
 from nano_c_slam.viz.animation import save_gif
 
 DRONE_COLORS = ["tab:blue", "tab:orange"]
+SCAN_FRAMES = 20
 OUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 
 
@@ -88,11 +89,11 @@ def main() -> None:
         [(1.0, 3.5, 1.0, 2.7), (3.8, -1.5, 3.8, -0.7)]  # asymmetric features for ICP
     )
     sensor = QuadToFSensor(max_range=12.0, noise_sigma=0.01)
-    steps, anchors = square_mission(side=2.0, laps=2, increments=15, scan_frames=20)
+    steps, anchors = square_mission(side=2.0, laps=2, increments=15, scan_frames=SCAN_FRAMES)
 
     # Two drones with known take-off poses; drone 1 starts one square to the right.
-    m0 = simulate_mission(0, Pose2D(0, 0, 0), steps, anchors, 20, world, sensor, np.random.default_rng(1))
-    m1 = simulate_mission(1, Pose2D(2, 0, 0), steps, anchors, 20, world, sensor, np.random.default_rng(2))
+    m0 = simulate_mission(0, Pose2D(0, 0, 0), steps, anchors, SCAN_FRAMES, world, sensor, np.random.default_rng(1))
+    m1 = simulate_mission(1, Pose2D(2, 0, 0), steps, anchors, SCAN_FRAMES, world, sensor, np.random.default_rng(2))
 
     # --- Cascaded optimization: drone 0 first, then drone 1 aligns to it ---
     corrected0 = own_graph(m0).optimize(fixed_ids=(0,))
@@ -141,11 +142,25 @@ def _plot_before_after(world, m0, m1, corrected0, corrected1):
 
 
 def _animate(world, m0, m1):
-    """A runtime GIF: both drones (squares) flying, odometry trails drifting."""
+    """A runtime GIF: drones (squares) flying, odometry trails, and the live map.
+
+    The point clouds are each scan placed at the drone's *believed* (odometry)
+    pose at acquisition time, revealed once the scan finishes -- so you watch the
+    live map build up and smear as odometry drifts (this is the pre-correction
+    belief; R6's optimization is what later snaps it straight).
+    """
     missions = [m0, m1]
     n_poses = len(m0.truth)
     n_frames = 90
     stride = max(1, n_poses // n_frames)
+
+    # Precompute, per drone, each scan's world points (odometry frame) and the
+    # time it becomes available (after its 20-frame rotation completes).
+    revealed = []
+    for mission in missions:
+        items = [(s.anchor_id + SCAN_FRAMES, transform_points(s.anchor_pose, s.cloud)[::3])
+                 for s in mission.scans]
+        revealed.append(items)
 
     fig, ax = plt.subplots(figsize=(7, 6))
 
@@ -154,16 +169,21 @@ def _animate(world, m0, m1):
         t = min(frame * stride, n_poses - 1)
         for x1, y1, x2, y2 in world.walls:
             ax.plot([x1, x2], [y1, y2], color="black", linewidth=1.5)
-        for mission, color in zip(missions, DRONE_COLORS):
+        for mission, color, items in zip(missions, DRONE_COLORS, revealed):
+            # Accumulated live map: every scan revealed so far.
+            shown = [pts for reveal_t, pts in items if reveal_t <= t]
+            if shown:
+                cloud = np.vstack(shown)
+                ax.scatter(cloud[:, 0], cloud[:, 1], s=2, alpha=0.15, color=color)
             odom = mission.odom
             ax.plot([p.x for p in odom[: t + 1]], [p.y for p in odom[: t + 1]],
                     color=color, linewidth=1, alpha=0.8)
             ax.plot(mission.truth[t].x, mission.truth[t].y, marker="s",
                     color=color, markersize=12)
         ax.set_aspect("equal")
-        ax.set_xlim(-2, 6)
-        ax.set_ylim(-2, 4)
-        ax.set_title(f"R6 runtime: two drones mapping (t={t})")
+        ax.set_xlim(-3, 7)
+        ax.set_ylim(-3, 5)
+        ax.set_title(f"R6 runtime: two drones mapping live (t={t})")
 
     os.makedirs(OUT_DIR, exist_ok=True)
     out = os.path.join(OUT_DIR, "06_two_drone_runtime.gif")
