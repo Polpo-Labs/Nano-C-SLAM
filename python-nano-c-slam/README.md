@@ -32,8 +32,9 @@ python-nano-c-slam/
 │   ├── sim/              # the 2D world: kinematics, ToF ray-casting, noisy odometry, UWB
 │   ├── slam/             # scan building, ICP, hierarchical PGO, distributed C-SLAM
 │   ├── exploration/      # Cruise/Spinning/Caution state machine
-│   ├── comms/            # token-based ranging + data protocol
-│   └── viz/              # 2D monitor + Foxglove streaming
+│   ├── comms/            # message-passing swarm protocol + accounting
+│   ├── viz/              # 2D monitor + animation / Foxglove streaming
+│   └── analysis/         # scalability model + accuracy metrics (evaluation)
 ├── experiments/          # runnable scenarios + scalability studies
 ├── tests/                # pytest unit tests (one per isolated component)
 ├── requirements.txt
